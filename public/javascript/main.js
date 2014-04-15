@@ -5,6 +5,7 @@
 
   var cur_video_blob = null;
   var fb_instance;
+  var msg_count = 0;
 
   $(document).ready(function(){
     connect_to_chat_firebase();
@@ -13,7 +14,7 @@
 
   function connect_to_chat_firebase(){
     /* Include your Firebase link here!*/
-    fb_instance = new Firebase("https://gsroth-p3-v1.firebaseio.com");
+    fb_instance = new Firebase("https://cs247-p3-strand.firebaseio.com");
 
     // generate new chatroom id or use existing id
     var url_segments = document.location.href.split("/#");
@@ -23,6 +24,9 @@
       fb_chat_room_id = Math.random().toString(36).substring(7);
     }
     display_msg({m:"Share this url with your friend to join this chat: "+ document.location.origin+"/#"+fb_chat_room_id,c:"red"})
+    display_msg({m:"Messages with emoticons will be animated and come with video.",c:"red"});
+    display_msg({m:"To see an old video replayed, hover over the message. Click the video to close.",c:"red"});
+    display_msg({m:"",c:"red"});
 
     // set up variables to access firebase data structure
     var fb_new_chat_room = fb_instance.child('chatrooms').child(fb_chat_room_id);
@@ -49,7 +53,8 @@
     // bind submission box
     $("#submission input").keydown(function( event ) {
       if (event.which == 13) {
-        if(has_emotions($(this).val())){
+        var emotion = has_emotions($(this).val());
+        if(emotion){
           fb_instance_stream.push({m:username+": " +$(this).val(), v:cur_video_blob, c: my_color});
         }else{
           fb_instance_stream.push({m:username+": " +$(this).val(), c: my_color});
@@ -61,10 +66,15 @@
 
   // creates a message node and appends it to the conversation
   function display_msg(data){
-    $("#conversation").append("<div class='msg' style='color:"+data.c+"'>"+data.m+"</div>");
+    msg_count++;
+    $(".hover_vid").hide();
     if(data.v){
       // for video element
+      type_message(data, msg_count);
+
       var video = document.createElement("video");
+      video.id = "vid_"+msg_count;
+      video.className = "hover_vid";
       video.autoplay = true;
       video.controls = false; // optional
       video.loop = true;
@@ -75,15 +85,48 @@
       source.type =  "video/webm";
 
       video.appendChild(source);
-
+      
       // for gif instead, use this code below and change mediaRecorder.mimeType in onMediaSuccess below
       // var video = document.createElement("img");
       // video.src = URL.createObjectURL(base64_to_blob(data.v));
 
       document.getElementById("conversation").appendChild(video);
+      $("#msg_"+msg_count).hover(function() {
+        $this = $(this);
+        var id = $this.attr('id').substring(4);
+        var vid = $("#vid_"+id);
+        vid.fadeIn();
+        //vid.left = "0px";
+        //vid.top = "0px";
+      });
+      $("#vid_"+msg_count).click(function() {
+        $this = $(this);
+        var id = $this.attr('id').substring(4);
+        var vid = $("#vid_"+id);
+        vid.fadeOut();
+      });
+    } else {
+      $("#conversation").append("<div class='msg' style='color:"+data.c+"' id='msg_"+msg_count+"'>"+data.m+"</div>");
     }
     // Scroll to the bottom every time we display a new message
     scroll_to_bottom(0);
+  }
+
+  var showText = function (target, msg, index, interval) {
+    console.log(msg.length);
+    if (index < msg.length) {
+      $(target).append(msg[index++]);
+      setTimeout(function () { showText(target, msg, index, interval); }, interval);
+    }
+  }
+
+  function type_message(data, msg_count) {
+    $("#conversation").append("<div class='vid_msg' style='color:"+data.c+"' id='msg_"+msg_count+"'></div>");
+    var start = data.m.indexOf(": ");
+    $("#msg_"+msg_count).append(data.m.substring(0, start + 1));
+    var target = "#msg_"+msg_count; 
+    showText(target, data.m, start + 1, 50)
+    // $("#msg_"+msg_count).append(data.m[i]);
   }
 
   function scroll_to_bottom(wait_time){
@@ -166,7 +209,7 @@
     var options = ["lol",":)",":("];
     for(var i=0;i<options.length;i++){
       if(msg.indexOf(options[i])!= -1){
-        return true;
+        return options[i];
       }
     }
     return false;
